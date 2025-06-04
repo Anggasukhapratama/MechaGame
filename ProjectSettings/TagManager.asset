@@ -3,7 +3,16 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Trap
+  - Enemy
+  - Item_Obeng
+  - Item_Tang
+  - Item_Kunci
+  - HealthPickup
+  - DeathZone
+  - Door
+  - Acid
   layers:
   - Default
   - TransparentFX
