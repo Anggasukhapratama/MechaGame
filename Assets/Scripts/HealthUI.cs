@@ -1,16 +1,17 @@
+// File: HealthUI.cs
 using UnityEngine;
 using TMPro;
-using UnityEngine.UI; // PENTING: Perlu ini untuk menggunakan komponen Image
+using UnityEngine.UI; 
+using System; 
+using UnityEngine.SceneManagement; // <-- TAMBAH INI
 
 public class HealthUI : MonoBehaviour
 {
     [Header("Player Health UI")]
-    [SerializeField] private Image[] healthIcons; // Array untuk menampung gambar hati (Heart_1, Heart_2, Heart_3)
-    [SerializeField] private Sprite fullHeartSprite; // Sprite untuk gambar hati penuh
-    [SerializeField] private Sprite emptyHeartSprite; // Sprite untuk gambar hati kosong
+    [SerializeField] private Image[] healthIcons; 
+    [SerializeField] private Sprite fullHeartSprite; 
+    [SerializeField] private Sprite emptyHeartSprite; 
     
-    // public TextMeshProUGUI healthText; // Jika tidak digunakan lagi, Anda bisa menghapus baris ini
-
     [Header("Item Count UI")]
     [SerializeField] private TextMeshProUGUI obengCountText;
     [SerializeField] private TextMeshProUGUI tangCountText;
@@ -20,83 +21,78 @@ public class HealthUI : MonoBehaviour
     private int tangCount = 0;
     private int kunciCount = 0;
 
-    // Referensi ke script PlayerHealth (untuk mendapatkan darah saat ini)
     private PlayerHealth playerHealthRef; 
 
-    // Getters untuk jumlah item (jika script lain perlu membaca)
     public int GetObengCount() { return obengCount; }
     public int GetTangCount() { return tangCount; }
     public int GetKunciCount() { return kunciCount; }
 
     void Awake()
     {
-        UpdateItemDisplay(); // Perbarui display item saat game dimulai
-        
-        // Dapatkan referensi PlayerHealth saat script ini bangun.
-        // FindObjectOfType mencari objek pertama di scene yang memiliki komponen PlayerHealth.
+        // ResetAllItemCounts(); // <-- HAPUS ATAU KOMENTARI PANGGILAN INI DARI AWAKE
+        // Jika HealthUI Anda tidak DontDestroyOnLoad, Awake akan dipanggil setiap scene dan reset alami.
+        // Namun, kita akan menggunakan SceneManager.sceneLoaded sebagai pemicu utama.
+
         playerHealthRef = FindObjectOfType<PlayerHealth>(); 
         if (playerHealthRef == null)
         {
-            Debug.LogError("PlayerHealth script not found in scene. Health UI will not function correctly.", this);
+            Debug.LogError("HealthUI: PlayerHealth script not found in scene. Health UI will not function correctly.", this);
         }
     }
 
     void OnEnable()
     {
-        // Langganan ke event perubahan darah dari PlayerHealth
         PlayerHealth.OnHealthChanged += UpdateHealthDisplay;
-        // Langganan ke event pengumpulan item dari CollectibleItem (jika ada)
         CollectibleItem.OnItemCollected += HandleItemCollected;
+        // HAPUS LANGGANAN INI, KARENA INI YANG MEMBUAT RESET SAAT MATI
+        // PlayerHealth.OnPlayerRespawned += ResetAllItemCounts; 
 
-        // Paksa update UI dengan darah saat ini ketika HealthUI diaktifkan.
-        // Ini adalah kunci untuk memastikan UI menampilkan status darah yang benar sejak awal game.
+        // LANGGANAN KE EVENT SAAT SCENE BARU DIMUAT
+        SceneManager.sceneLoaded += OnSceneLoaded; // <-- BARU DITAMBAHKAN
+        
         if (playerHealthRef != null)
         {
             UpdateHealthDisplay(playerHealthRef.GetCurrentHealth());
+        }
+        else // Jika PlayerHealth belum ditemukan di Awake (misal, urutan eksekusi)
+        {
+            // Lakukan update UI untuk awal scene (misal, 0 item)
+            UpdateItemDisplay();
         }
     }
 
     void OnDisable()
     {
-        // Berhenti berlangganan saat script dinonaktifkan untuk mencegah error atau memori leak
         PlayerHealth.OnHealthChanged -= UpdateHealthDisplay;
         CollectibleItem.OnItemCollected -= HandleItemCollected;
+        // HAPUS JUGA BERHENTI LANGGANAN INI
+        // PlayerHealth.OnPlayerRespawned -= ResetAllItemCounts; 
+
+        // BERHENTI LANGGANAN SAAT SCENE BARU DIMUAT
+        SceneManager.sceneLoaded -= OnSceneLoaded; // <-- BARU DITAMBAHKAN
     }
 
     private void UpdateHealthDisplay(int currentHealth)
     {
-        // Pastikan array healthIcons sudah diisi di Inspector dan tidak kosong
         if (healthIcons == null || healthIcons.Length == 0)
         {
-            Debug.LogWarning("Health Icons array is not assigned or is empty in HealthUI. Make sure to assign all heart Image GameObjects in the Inspector.", this);
+            Debug.LogWarning("HealthUI: Health Icons array is not assigned or is empty. Assign heart Image GameObjects in the Inspector.", this);
             return;
         }
 
-        // Loop melalui setiap gambar hati yang ada di array
         for (int i = 0; i < healthIcons.Length; i++)
         {
-            // Pastikan elemen array itu sendiri tidak null (misal, jika ada slot kosong di Inspector)
             if (healthIcons[i] != null)
             {
-                // Jika indeks hati (i) lebih kecil dari jumlah darah saat ini,
-                // berarti hati tersebut harus ditampilkan sebagai hati penuh.
-                // Contoh: Jika currentHealth = 3:
-                // i=0 (0<3) -> fullHeart
-                // i=1 (1<3) -> fullHeart
-                // i=2 (2<3) -> fullHeart
-                // Contoh: Jika currentHealth = 2:
-                // i=0 (0<2) -> fullHeart
-                // i=1 (1<2) -> fullHeart
-                // i=2 (2 BUKAN < 2) -> emptyHeart
                 if (i < currentHealth)
                 {
                     healthIcons[i].sprite = fullHeartSprite;
-                    healthIcons[i].enabled = true; // Pastikan gambar terlihat
+                    healthIcons[i].enabled = true; 
                 }
-                else // Jika tidak, berarti hati itu kosong
+                else 
                 {
                     healthIcons[i].sprite = emptyHeartSprite;
-                    healthIcons[i].enabled = true; // Pastikan gambar terlihat
+                    healthIcons[i].enabled = true; 
                 }
             }
         }
@@ -116,10 +112,27 @@ public class HealthUI : MonoBehaviour
                 kunciCount++;
                 break;
             default:
-                Debug.LogWarning($"Tipe item tidak dikenal: {itemType}", this);
+                Debug.LogWarning($"HealthUI: Unknown item type collected: {itemType}", this);
                 break;
         }
-        UpdateItemDisplay(); // Perbarui display item setelah item terkumpul
+        UpdateItemDisplay(); 
+    }
+
+    // FUNGSI BARU: Dipanggil saat scene baru dimuat
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        // Reset item counts hanya saat scene baru dimuat (bukan saat player mati di tengah level)
+        Debug.Log($"HealthUI: Scene '{scene.name}' loaded. Resetting item counts.");
+        ResetAllItemCounts(); 
+    }
+
+    // FUNGSI UNTUK MERESET SEMUA JUMLAH ITEM
+    private void ResetAllItemCounts()
+    {
+        obengCount = 0;
+        tangCount = 0;
+        kunciCount = 0;
+        UpdateItemDisplay(); 
     }
 
     private void UpdateItemDisplay()

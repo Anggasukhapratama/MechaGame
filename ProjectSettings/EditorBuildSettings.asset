@@ -26,4 +26,22 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Credits.unity
     guid: fa2087172105ec048893bf9c58a293c7
+  - enabled: 1
+    path: Assets/Scenes/EndLevel.unity
+    guid: a989d7dc9f27722429937b730fd49fd4
+  - enabled: 1
+    path: Assets/Scenes/ColectCar1.unity
+    guid: f85c84519ac51734e9849d586f02043f
+  - enabled: 1
+    path: Assets/Scenes/ColectCar2.unity
+    guid: 16baa6bf64437d8459ff6cad2992c682
+  - enabled: 1
+    path: Assets/Scenes/ColectCar3.unity
+    guid: 078f591dba9240a47881403b1e629cc4
+  - enabled: 1
+    path: Assets/Scenes/MenuCollection.unity
+    guid: db2add26d1fdcda4aae0891f213aa36d
+  - enabled: 1
+    path: Assets/Scenes/TutorialScene.unity
+    guid: 92278284570f3484c818c0390ad06e39
   m_configObjects: {}

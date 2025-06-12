@@ -1,114 +1,91 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class MainMenu : MonoBehaviour
 {
-    public Button playButton;
+    public Button newGameButton;
+    public Button continueButton;
+    public Button collectionButton;
     public Button creditsButton;
     public Button exitButton;
     public float fadeDuration = 0.5f;
 
     void Start()
     {
-        // Setup listener untuk setiap tombol
-        playButton.onClick.AddListener(() => StartCoroutine(FadeAndLoadScene("LevelMenu")));
+        // --- DEBUGGING: CEK DAN RESET PLAYERPREFS SEMENTARA ---
+        // Baris ini bisa Anda hapus atau jadikan komentar setelah debugging selesai.
+        Debug.Log("Current LevelUnlocked PlayerPref: " + PlayerPrefs.GetInt("LevelUnlocked", 1));
+        // Jika Anda ingin memastikan tombol "Continue" nonaktif di setiap awal run untuk testing:
+        // PlayerPrefs.DeleteKey("LevelUnlocked"); // Hapus kunci LevelUnlocked
+        // Debug.Log("LevelUnlocked PlayerPref after deletion: " + PlayerPrefs.GetInt("LevelUnlocked", 1));
+        // --- AKHIR DEBUGGING ---
+
+        newGameButton.onClick.AddListener(() => StartCoroutine(StartNewGame()));
+        continueButton.onClick.AddListener(() => StartCoroutine(ContinueToLevelMenu()));
+        collectionButton.onClick.AddListener(() => StartCoroutine(FadeAndLoadScene("MenuCollection")));
         creditsButton.onClick.AddListener(() => StartCoroutine(FadeAndLoadScene("Credits")));
         exitButton.onClick.AddListener(() => StartCoroutine(FadeAndQuit()));
+
+        // Enable continue jika LevelUnlocked > 1
+        if (PlayerPrefs.GetInt("LevelUnlocked", 1) > 1)
+        {
+            continueButton.interactable = true;
+        }
+        else
+        {
+            continueButton.interactable = false;
+        }
+    }
+
+    IEnumerator StartNewGame()
+    {
+        PlayerPrefs.SetInt("LevelUnlocked", 1); // Reset progres
+        PlayerPrefs.Save(); // Penting: Pastikan data disimpan segera setelah di-reset
+        yield return StartCoroutine(FadeAndLoadScene("LevelMenu"));
+    }
+
+    IEnumerator ContinueToLevelMenu()
+    {
+        yield return StartCoroutine(FadeAndLoadScene("LevelMenu"));
     }
 
     IEnumerator FadeAndLoadScene(string sceneName)
     {
-        // Dapatkan semua Image dan Text di button
-        Image[] buttonImages = { playButton.GetComponent<Image>(), 
-                                creditsButton.GetComponent<Image>(), 
-                                exitButton.GetComponent<Image>() };
-        
-        Text[] buttonTexts = { playButton.GetComponentInChildren<Text>(), 
-                             creditsButton.GetComponentInChildren<Text>(), 
-                             exitButton.GetComponentInChildren<Text>() };
+        Button[] buttons = { newGameButton, continueButton, collectionButton, creditsButton, exitButton }; // Tambahkan collectionButton
 
-        // Animasi fade out
         float elapsedTime = 0f;
         while (elapsedTime < fadeDuration)
         {
             elapsedTime += Time.deltaTime;
             float alpha = Mathf.Lerp(1f, 0f, elapsedTime / fadeDuration);
-            
-            foreach (Image img in buttonImages)
+
+            foreach (var btn in buttons)
             {
-                if (img != null)
+                if (btn != null)
                 {
-                    Color c = img.color;
-                    c.a = alpha;
-                    img.color = c;
+                    var img = btn.GetComponent<Image>();
+                    var txt = btn.GetComponentInChildren<Text>();
+                    if (img != null) img.color = new Color(img.color.r, img.color.g, img.color.b, alpha);
+                    if (txt != null) txt.color = new Color(txt.color.r, txt.color.g, txt.color.b, alpha);
                 }
             }
-            
-            foreach (Text txt in buttonTexts)
-            {
-                if (txt != null)
-                {
-                    Color c = txt.color;
-                    c.a = alpha;
-                    txt.color = c;
-                }
-            }
-            
+
             yield return null;
         }
 
-        // Load scene setelah fade selesai
         SceneManager.LoadScene(sceneName);
     }
 
     IEnumerator FadeAndQuit()
     {
-        // Sama seperti fade untuk load scene
-        Image[] buttonImages = { playButton.GetComponent<Image>(), 
-                                creditsButton.GetComponent<Image>(), 
-                                exitButton.GetComponent<Image>() };
-        
-        Text[] buttonTexts = { playButton.GetComponentInChildren<Text>(), 
-                             creditsButton.GetComponentInChildren<Text>(), 
-                             exitButton.GetComponentInChildren<Text>() };
+        yield return StartCoroutine(FadeAndLoadScene("Exit")); // Asumsi ada scene "Exit"
 
-        float elapsedTime = 0f;
-        while (elapsedTime < fadeDuration)
-        {
-            elapsedTime += Time.deltaTime;
-            float alpha = Mathf.Lerp(1f, 0f, elapsedTime / fadeDuration);
-            
-            foreach (Image img in buttonImages)
-            {
-                if (img != null)
-                {
-                    Color c = img.color;
-                    c.a = alpha;
-                    img.color = c;
-                }
-            }
-            
-            foreach (Text txt in buttonTexts)
-            {
-                if (txt != null)
-                {
-                    Color c = txt.color;
-                    c.a = alpha;
-                    txt.color = c;
-                }
-            }
-            
-            yield return null;
-        }
-
-        // Keluar dari game
         #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
+        UnityEditor.EditorApplication.isPlaying = false;
         #else
-            Application.Quit();
+        Application.Quit();
         #endif
     }
 }

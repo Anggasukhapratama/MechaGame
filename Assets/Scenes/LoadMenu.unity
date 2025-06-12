@@ -38,7 +38,6 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -157,10 +156,10 @@ RectTransform:
   m_Father: {fileID: 1964562377}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.33400002, y: 0.079352945}
-  m_AnchorMax: {x: 0.63652843, y: 0.20588236}
-  m_AnchoredPosition: {x: -1, y: 0.5}
-  m_SizeDelta: {x: 82.1653, y: 87.2415}
+  m_AnchorMin: {x: 0.3413801, y: 0.09367959}
+  m_AnchorMax: {x: 0.63169, y: 0.20874768}
+  m_AnchoredPosition: {x: -2, y: -2.5}
+  m_SizeDelta: {x: 92.1653, y: 91.2415}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &333967710
 MonoBehaviour:
@@ -238,7 +237,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 6b1919a20eeae1547b350550b49dc1a8, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 474f343b2634f4645a61e0f54948d339, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -561,6 +560,7 @@ Canvas:
   m_OverrideSorting: 0
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
   m_AdditionalShaderChannelsFlag: 25
   m_SortingLayerID: 0
   m_SortingOrder: 0

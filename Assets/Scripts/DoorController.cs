@@ -1,6 +1,6 @@
 using UnityEngine;
-using UnityEngine.SceneManagement; 
-using System.Collections; 
+using UnityEngine.SceneManagement;
+using System.Collections;
 
 [RequireComponent(typeof(SpriteRenderer))]
 [RequireComponent(typeof(Collider2D))]
@@ -22,11 +22,9 @@ public class DoorController : MonoBehaviour
 
     private SpriteRenderer spriteRenderer;
     private Collider2D doorCollider;
-    
-    // --- PENTING: Gunakan [SerializeField] untuk HealthUI di sini ---
+
     [Tooltip("Seret GameObject yang memiliki script HealthUI (biasanya Canvas) ke slot ini di Inspector.")]
-    [SerializeField] private HealthUI healthUI; // Sekarang diset melalui Inspector
-    // --- AKHIR PENTING ---
+    [SerializeField] private HealthUI healthUI; 
 
     private bool isUnlocked = false; 
 
@@ -35,21 +33,19 @@ public class DoorController : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         doorCollider = GetComponent<Collider2D>();
 
-        // Log untuk memastikan komponen ditemukan
-        if (spriteRenderer == null) Debug.LogError("Door: SpriteRenderer not found!", this);
-        if (doorCollider == null) Debug.LogError("Door: Collider2D not found!", this);
+        if (spriteRenderer == null) Debug.LogError("DoorController: SpriteRenderer not found!", this);
+        if (doorCollider == null) Debug.LogError("DoorController: Collider2D not found!", this);
         
-        // PENTING: Cek apakah healthUI sudah terhubung di Inspector
         if (healthUI == null)
         {
-            Debug.LogError("Door: HealthUI reference is NULL in Inspector! Please assign it.", this);
+            // Ini akan muncul di konsol jika Anda lupa menyeret HealthUI di Inspector
+            Debug.LogError($"DoorController on '{gameObject.name}': HealthUI reference is NULL in Inspector! Please assign it.", this);
         }
 
-        // Atur pintu pada kondisi awal: terkunci dan solid (tidak bisa dilewati)
         if (doorCollider != null)
         {
             doorCollider.isTrigger = false; 
-            Debug.Log($"Door '{gameObject.name}' Awake: Initial isTrigger set to {doorCollider.isTrigger} (solid).");
+            Debug.Log($"DoorController on '{gameObject.name}': Initial collider isTrigger set to {doorCollider.isTrigger} (solid).");
         }
         if (spriteRenderer != null)
         {
@@ -59,7 +55,7 @@ public class DoorController : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning("Door: Locked Door Sprite is not assigned!", this);
+                Debug.LogWarning($"DoorController on '{gameObject.name}': Locked Door Sprite is not assigned!", this);
             }
         }
         
@@ -68,45 +64,57 @@ public class DoorController : MonoBehaviour
 
     void OnEnable()
     {
-        // Berlangganan event saat objek aktif
-        // Pastikan healthUI tidak NULL sebelum mencoba subscribe
         if (healthUI != null)
         {
             CollectibleItem.OnItemCollected += OnItemCollectedHandler;
-            Debug.Log("DoorController subscribed to OnItemCollected.");
+            Debug.Log($"DoorController on '{gameObject.name}': Subscribed to OnItemCollected.");
         }
         else
         {
-            Debug.LogError("DoorController OnEnable: HealthUI is NULL, cannot subscribe to item events. Assign in Inspector!", this);
+            Debug.LogError($"DoorController on '{gameObject.name}': OnEnable: HealthUI is NULL, cannot subscribe to item events. Assign in Inspector!", this);
         }
     }
 
     void OnDisable()
     {
-        // Berhenti berlangganan saat objek dinonaktifkan atau dihancurkan
-        // Pastikan healthUI tidak NULL sebelum mencoba unsubscribe
         if (healthUI != null) 
         {
             CollectibleItem.OnItemCollected -= OnItemCollectedHandler;
-            Debug.Log("DoorController unsubscribed from OnItemCollected.");
+            Debug.Log($"DoorController on '{gameObject.name}': Unsubscribed from OnItemCollected.");
         }
         else
         {
-            Debug.LogWarning("DoorController OnDisable: healthUI was NULL, could not unsubscribe. (This might be normal if the object is being destroyed).");
+            Debug.LogWarning($"DoorController on '{gameObject.name}': OnDisable: healthUI was NULL, could not unsubscribe. (This might be normal if the object is being destroyed).");
         }
     }
 
     private void OnItemCollectedHandler(string itemType)
     {
-        Debug.Log($"DoorController: Item '{itemType}' collected. Re-checking door state.");
+        // --- KODE PERBAIKAN DI SINI ---
+        // PENTING: Periksa apakah objek DoorController ini sudah dihancurkan.
+        // Ini mencegah MissingReferenceException jika event dipicu setelah scene berganti
+        // dan objek ini sudah tidak ada, tetapi masih berlangganan event statis.
+        if (this == null) 
+        {
+            // Objek DoorController ini sudah dihancurkan.
+            // Hapus langganan dari event statis untuk menghindari error di masa mendatang.
+            CollectibleItem.OnItemCollected -= OnItemCollectedHandler; 
+            Debug.LogWarning($"DoorController: Instance of a DoorController was destroyed. Unsubscribing from OnItemCollected event to prevent errors.");
+            return; // Hentikan eksekusi method ini karena objek sudah tidak ada
+        }
+        // --- AKHIR KODE PERBAIKAN ---
+
+        Debug.Log($"DoorController on '{gameObject.name}': Item '{itemType}' collected. Re-checking door state.");
         UpdateDoorState();
     }
 
     private void UpdateDoorState()
     {
+        Debug.Log($"DoorController on '{gameObject.name}': Calling UpdateDoorState().");
+
         if (healthUI == null)
         {
-            Debug.LogWarning("UpdateDoorState: HealthUI is NULL. Cannot check item counts. Please assign HealthUI in Inspector.", this);
+            Debug.LogWarning($"DoorController on '{gameObject.name}': UpdateDoorState: HealthUI is NULL. Cannot check item counts. This warning implies a missing Inspector assignment or a scene loading issue.", this);
             return;
         }
 
@@ -114,15 +122,15 @@ public class DoorController : MonoBehaviour
         int currentTang = healthUI.GetTangCount();
         int currentKunci = healthUI.GetKunciCount();
 
-        Debug.Log($"Door State: Current items - Obeng:{currentObeng}, Tang:{currentTang}, Kunci:{currentKunci}");
-        Debug.Log($"Door State: Required items - Obeng:{requiredObeng}, Tang:{requiredTang}, Kunci:{requiredKunci}");
+        Debug.Log($"DoorController on '{gameObject.name}': Current items - Obeng:{currentObeng}, Tang:{currentTang}, Kunci:{currentKunci}");
+        Debug.Log($"DoorController on '{gameObject.name}': Required items - Obeng:{requiredObeng}, Tang:{requiredTang}, Kunci:{requiredKunci}");
 
         bool allItemsCollected = 
             currentObeng >= requiredObeng &&
             currentTang >= requiredTang &&
             currentKunci >= requiredKunci;
 
-        Debug.Log($"Door State: All items collected status is {allItemsCollected}. isUnlocked is {isUnlocked}.");
+        Debug.Log($"DoorController on '{gameObject.name}': All items collected status is {allItemsCollected}. Current isUnlocked status: {isUnlocked}.");
 
         if (allItemsCollected && !isUnlocked)
         {
@@ -130,62 +138,63 @@ public class DoorController : MonoBehaviour
         }
         else if (!allItemsCollected && isUnlocked) 
         {
+            // Ini akan mengunci kembali pintu jika item tiba-tiba hilang (misal: di-debug)
             LockDoor(); 
         }
         else if (allItemsCollected && isUnlocked) 
         {
-            Debug.Log("Door State: Door is already unlocked and all items collected.");
+            Debug.Log($"DoorController on '{gameObject.name}': Door is already unlocked and all items collected. No change needed.");
         }
         else 
         {
-            Debug.Log("Door State: Not all items collected yet. Door remains locked.");
+            Debug.Log($"DoorController on '{gameObject.name}': Not all items collected yet. Door remains locked.");
         }
     }
 
     private void UnlockDoor()
     {
         isUnlocked = true;
-        Debug.Log("UnlockDoor: Method called. Setting isUnlocked to true.");
+        Debug.Log($"DoorController on '{gameObject.name}': UnlockDoor() called. isUnlocked set to TRUE. Door UNLOCKED!");
 
         if (spriteRenderer != null)
         {
             if (unlockedDoorSprite != null)
             {
                 spriteRenderer.sprite = unlockedDoorSprite;
-                Debug.Log("UnlockDoor: Changed sprite to Unlocked Door.");
+                Debug.Log($"DoorController on '{gameObject.name}': Changed sprite to Unlocked Door.");
             }
             else
             {
-                Debug.LogWarning("UnlockDoor: Unlocked Door Sprite is not assigned!", this);
+                Debug.LogWarning($"DoorController on '{gameObject.name}': Unlocked Door Sprite is not assigned! Door will be unlocked but sprite won't change.", this);
             }
         }
 
         if (doorCollider != null)
         {
             doorCollider.isTrigger = true; 
-            Debug.Log($"UnlockDoor: Door collider isTrigger set to {doorCollider.isTrigger} (passable).");
+            Debug.Log($"DoorController on '{gameObject.name}': Door collider isTrigger set to {doorCollider.isTrigger} (passable).");
         }
         else
         {
-            Debug.LogError("UnlockDoor: doorCollider is NULL. Cannot set isTrigger.", this);
+            Debug.LogError($"DoorController on '{gameObject.name}': doorCollider is NULL in UnlockDoor(). Cannot set isTrigger.", this);
         }
     }
 
     private void LockDoor()
     {
         isUnlocked = false;
-        Debug.Log("LockDoor: Method called. Setting isUnlocked to false.");
+        Debug.Log($"DoorController on '{gameObject.name}': LockDoor() called. isUnlocked set to FALSE. Door LOCKED!");
 
         if (spriteRenderer != null && lockedDoorSprite != null)
         {
             spriteRenderer.sprite = lockedDoorSprite;
-            Debug.Log("LockDoor: Changed sprite to Locked Door.");
+            Debug.Log($"DoorController on '{gameObject.name}': Changed sprite to Locked Door.");
         }
 
         if (doorCollider != null)
         {
             doorCollider.isTrigger = false; 
-            Debug.Log($"LockDoor: Door collider isTrigger set to {doorCollider.isTrigger} (solid).");
+            Debug.Log($"DoorController on '{gameObject.name}': Door collider isTrigger set to {doorCollider.isTrigger} (solid).");
         }
     }
 
@@ -193,27 +202,27 @@ public class DoorController : MonoBehaviour
     {
         if (other.CompareTag("Player")) 
         {
-            Debug.Log($"OnTriggerEnter2D: Player '{other.gameObject.name}' entered door area. Door's current isUnlocked status: {isUnlocked}.");
+            Debug.Log($"DoorController on '{gameObject.name}': OnTriggerEnter2D called by Player. Door's current isUnlocked status: {isUnlocked}.");
             if (isUnlocked)
             {
-                Debug.Log($"OnTriggerEnter2D: Door is unlocked! Loading scene: {nextSceneName}");
+                Debug.Log($"DoorController on '{gameObject.name}': Door is unlocked! Loading scene: {nextSceneName}");
                 SceneManager.LoadScene(nextSceneName); 
             }
             else
             {
                 if (healthUI != null)
                 {
-                    Debug.Log($"OnTriggerEnter2D: Door is locked! Please collect all items. Current: O:{healthUI.GetObengCount()}/R:{requiredObeng}, T:{healthUI.GetTangCount()}/R:{requiredTang}, K:{healthUI.GetKunciCount()}/R:{requiredKunci}");
+                    Debug.Log($"DoorController on '{gameObject.name}': Door is locked! Please collect all items. Current: O:{healthUI.GetObengCount()}/R:{requiredObeng}, T:{healthUI.GetTangCount()}/R:{requiredTang}, K:{healthUI.GetKunciCount()}/R:{requiredKunci}");
                 }
                 else
                 {
-                    Debug.Log("OnTriggerEnter2D: Door is locked! (HealthUI not found to show missing items).");
+                    Debug.Log($"DoorController on '{gameObject.name}': Door is locked! (HealthUI not found to show missing items, check Inspector).");
                 }
             }
         }
         else
         {
-            Debug.Log($"OnTriggerEnter2D: Non-player object '{other.gameObject.name}' entered door area. Tag: {other.tag}");
+            Debug.Log($"DoorController on '{gameObject.name}': OnTriggerEnter2D called by non-player object '{other.gameObject.name}'. Tag: {other.tag}");
         }
     }
 }

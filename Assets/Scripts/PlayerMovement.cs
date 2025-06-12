@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem; 
+using UnityEngine.InputSystem;
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -15,37 +15,38 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody2D rb;
     private Animator anim;
     private SpriteRenderer sprite;
-    private PlayerController playerController; 
+    private PlayerController playerController;
 
-    // Referensi ke script PlayerHealth (seret di Inspector jika belum otomatis terisi)
-    [SerializeField] private PlayerHealth playerHealth; 
+    [SerializeField] private PlayerHealth playerHealth;
 
-    private float mobileInputX = 0f; // Input dari tombol mobile UI
-
+    private float mobileInputX = 0f;
     private Vector2 moveInput;
     private bool isJumping = false;
-    public bool isSliding = false; 
+    public bool isSliding = false;
     private float slideTime;
 
-    // Enum untuk mengelola state animasi
-    private enum MovementState { idle, run, jump, slide, dead } 
+    private enum MovementState { idle = 0, run = 1, jump = 2, slide = 3, dead = 4, hurt = 5 }
 
     [Header("Jump Settings")]
-    [SerializeField] private LayerMask jumpableGround; // Layer untuk tanah yang bisa diinjak
-    private BoxCollider2D coll; 
+    [SerializeField] private LayerMask jumpableGround;
+    private BoxCollider2D coll;
 
-    private bool isPlayerDead = false; // Flag untuk melacak status kematian pemain
+    private bool isPlayerDead = false;
+    private bool isHurt = false;
+
+    [SerializeField] private string hurtAnimationStateName = "Hurt";
+
+    private MovementState currentState = MovementState.idle;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
         sprite = GetComponent<SpriteRenderer>();
-        coll = GetComponent<BoxCollider2D>(); 
+        coll = GetComponent<BoxCollider2D>();
 
-        playerController = new PlayerController(); // Inisialisasi Input System
+        playerController = new PlayerController();
 
-        // Pastikan playerHealth terisi, kalau belum coba ambil otomatis
         if (playerHealth == null)
         {
             playerHealth = GetComponent<PlayerHealth>();
@@ -54,35 +55,34 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnEnable()
     {
-        playerController.Enable(); // Aktifkan input system
+        playerController.Enable();
 
-        // Berlangganan event input dari Input System
         playerController.Movement.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
         playerController.Movement.Move.canceled += ctx => moveInput = Vector2.zero;
 
         playerController.Movement.Jump.performed += ctx => Jump();
         playerController.Movement.Slide.performed += ctx => Slide();
 
-        // Berlangganan event kematian dan respawn dari PlayerHealth
-        PlayerHealth.OnPlayerDied += HandlePlayerDeath; 
-        PlayerHealth.OnPlayerRespawned += HandlePlayerRespawn; 
+        PlayerHealth.OnPlayerDied += HandlePlayerDeath;
+        PlayerHealth.OnPlayerRespawned += HandlePlayerRespawn;
+        PlayerHealth.OnPlayerHurt += HandlePlayerHurt;
     }
 
     private void OnDisable()
     {
-        playerController.Disable(); // Nonaktifkan input system
-        // Berhenti berlangganan event
-        PlayerHealth.OnPlayerDied -= HandlePlayerDeath; 
-        PlayerHealth.OnPlayerRespawned -= HandlePlayerRespawn; 
+        playerController.Disable();
+
+        PlayerHealth.OnPlayerDied -= HandlePlayerDeath;
+        PlayerHealth.OnPlayerRespawned -= HandlePlayerRespawn;
+        PlayerHealth.OnPlayerHurt -= HandlePlayerHurt;
     }
 
     private void Update()
     {
-        if (isPlayerDead) return; // Jangan lakukan apapun jika pemain mati
+        if (isPlayerDead || isHurt) return;
 
-        moveInput = playerController.Movement.Move.ReadValue<Vector2>(); // Baca input keyboard/gamepad
+        moveInput = playerController.Movement.Move.ReadValue<Vector2>();
 
-        // Logika durasi slide
         if (isSliding)
         {
             slideTime -= Time.deltaTime;
@@ -95,25 +95,23 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        // Jika pemain mati, biarkan Rigidbody dikendalikan oleh PlayerHealth.
-        // JANGAN atur velocity = Vector2.zero di sini saat mati.
-        if (isPlayerDead) 
-        {
-            return; // Cukup kembali saja, jangan lakukan kontrol movement lain
-        }
+        if (isPlayerDead) return;
 
-        // Kontrol gerakan horizontal (jika tidak sedang slide)
-        if (!isSliding)
+        if (isHurt)
         {
-            float combinedHorizontalInput = moveInput.x + mobileInputX; // Gabungkan input keyboard dan mobile
-            float speed = Mathf.Abs(combinedHorizontalInput) > 0.7f ? runSpeed : moveSpeed; // Lari jika input kuat
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+        else if (!isSliding)
+        {
+            float combinedHorizontalInput = moveInput.x + mobileInputX;
+            float speed = Mathf.Abs(combinedHorizontalInput) > 0.7f ? runSpeed : moveSpeed;
             Vector2 targetVelocity = new Vector2(combinedHorizontalInput * speed, rb.velocity.y);
             rb.velocity = targetVelocity;
         }
 
-        UpdateAnimation(); // Perbarui animasi pemain
+        UpdateAnimation();
 
-        // Cek apakah pemain di tanah untuk reset isJumping
         if (isGrounded() && Mathf.Abs(rb.velocity.y) < 0.01f)
         {
             isJumping = false;
@@ -122,60 +120,70 @@ public class PlayerMovement : MonoBehaviour
 
     private void UpdateAnimation()
     {
-        MovementState state;
+        MovementState newState;
 
-        if (isPlayerDead) 
+        float horizontal = moveInput.x + mobileInputX;
+
+        if (!isPlayerDead && horizontal != 0f)
         {
-            state = MovementState.dead; // Jika mati, set animasi mati
+            sprite.flipX = horizontal < 0f;
+        }
+
+        if (isPlayerDead)
+        {
+            newState = MovementState.dead;
+        }
+        else if (isHurt)
+        {
+            newState = MovementState.hurt;
         }
         else if (isSliding)
         {
-            state = MovementState.slide; // Jika slide, set animasi slide
+            newState = MovementState.slide;
         }
-        else if (rb.velocity.y > 0.1f || rb.velocity.y < -0.1f) // Cek vertikal untuk lompat/jatuh
+        else if (!isGrounded())
         {
-            state = MovementState.jump; // Jika melompat/jatuh, set animasi jump
+            newState = MovementState.jump;
         }
-        else 
+        else if (horizontal != 0f)
         {
-            float horizontal = moveInput.x + mobileInputX; 
-            if (horizontal != 0f)
-            {
-                state = MovementState.run; // Jika bergerak horizontal, set animasi run
-                sprite.flipX = horizontal < 0f; // Balik sprite sesuai arah
-            }
-            else
-            {
-                state = MovementState.idle; // Jika diam, set animasi idle
-            }
+            newState = MovementState.run;
+        }
+        else
+        {
+            newState = MovementState.idle;
         }
 
-        anim.SetInteger("state", (int)state); // Set parameter Animator
+        if (newState != currentState)
+        {
+            anim.SetInteger("state", (int)newState);
+            currentState = newState;
+        }
     }
 
-    // Cek apakah pemain berada di tanah
     private bool isGrounded()
     {
         return Physics2D.BoxCast(coll.bounds.center, coll.bounds.size, 0f, Vector2.down, .1f, jumpableGround);
     }
 
-    // Fungsi lompat
     private void Jump()
     {
-        if (isPlayerDead) return; // Jangan lompat jika mati
-        if (isGrounded() && !isSliding) // Hanya bisa lompat jika di tanah dan tidak sedang slide
+        if (isPlayerDead || isJumping || isSliding || isHurt) return;
+
+        if (isGrounded())
         {
             rb.velocity = new Vector2(rb.velocity.x, jumpForce);
             isJumping = true;
         }
     }
 
-    // Fungsi slide
     private void Slide()
     {
-        if (isPlayerDead) return; // Jangan slide jika mati
-        float horizontal = moveInput.x + mobileInputX; 
-        if (isGrounded() && !isSliding && horizontal != 0) // Hanya bisa slide jika di tanah, tidak sedang slide, dan ada input horizontal
+        if (isPlayerDead || isHurt) return;
+
+        float horizontal = moveInput.x + mobileInputX;
+
+        if (isGrounded() && !isSliding && horizontal != 0)
         {
             isSliding = true;
             slideTime = slideDuration;
@@ -183,48 +191,40 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    // Fungsi untuk tombol mobile (geser ke kanan)
     public void MoveRight(bool isPressed)
     {
-        if (isPlayerDead) { mobileInputX = 0f; return; } 
+        if (isPlayerDead || isHurt) { mobileInputX = 0f; return; }
         if (isPressed)
             mobileInputX = 1f;
-        else if (mobileInputX == 1f) 
+        else if (mobileInputX == 1f)
             mobileInputX = 0f;
     }
 
-    // Fungsi untuk tombol mobile (geser ke kiri)
     public void MoveLeft(bool isPressed)
     {
-        if (isPlayerDead) { mobileInputX = 0f; return; } 
+        if (isPlayerDead || isHurt) { mobileInputX = 0f; return; }
         if (isPressed)
             mobileInputX = -1f;
-        else if (mobileInputX == -1f) 
+        else if (mobileInputX == -1f)
             mobileInputX = 0f;
     }
 
-    // Fungsi untuk tombol mobile (lompat)
     public void MobileJump()
     {
-        if (isPlayerDead) return; 
+        if (isPlayerDead || isHurt) return;
         Jump();
     }
 
-    // Fungsi untuk tombol mobile (slide)
     public void MobileSlide()
     {
-        if (isPlayerDead) return; 
+        if (isPlayerDead || isHurt) return;
         Slide();
     }
 
-    // --- INTERAKSI FISIK (COLLISION) ---
-    // Fungsi ini menangani semua tabrakan fisik pemain (Is Trigger TIDAK DICENTANG)
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // Jangan proses collision jika pemain sudah mati
         if (isPlayerDead) return;
 
-        // Cek jika yang bertabrakan adalah monster
         if (collision.gameObject.CompareTag("Enemy"))
         {
             Enemy enemy = collision.gameObject.GetComponent<Enemy>();
@@ -232,55 +232,70 @@ public class PlayerMovement : MonoBehaviour
             {
                 if (isSliding)
                 {
-                    // Jika pemain sedang slide, monster mati
                     Debug.Log("Sliding into enemy! Enemy dies.");
-                    enemy.Die(); 
+                    enemy.Die();
                 }
                 else
                 {
-                    // Jika pemain tidak slide, pemain mengambil damage
                     Debug.Log("Touched enemy normally. Player takes damage.");
-                    playerHealth.TakeDamage(1); // Memicu TakeDamage yang akan memanggil HandleDeathByStopping
-                    // Optional: Dorong pemain sedikit ke belakang
-                    // Vector2 knockbackDirection = (transform.position - collision.transform.position).normalized;
-                    // rb.AddForce(knockbackDirection * 5f, ForceMode2D.Impulse);
+                    playerHealth.TakeDamage(1);
                 }
             }
         }
-        // Cek jika yang bertabrakan adalah jebakan
         else if (collision.gameObject.CompareTag("Trap"))
         {
-            // Untuk jebakan, selalu kurangi darah pemain, tidak peduli slide atau tidak
             Debug.Log("Hit a trap! Player takes damage.");
-            playerHealth.TakeDamage(1); // Memicu TakeDamage yang akan memanggil HandleDeathByStopping
-            // Optional: Dorong pemain sedikit ke belakang
-            // Vector2 knockbackDirection = (transform.position - collision.transform.position).normalized;
-            // rb.AddForce(knockbackDirection * 5f, ForceMode2D.Impulse);
+            playerHealth.TakeDamage(1);
         }
     }
 
-
-    // --- FUNGSI UNTUK MENANGANI KEMATIAN PEMAIN (DIPANGGIL DARI PLAYERHEALTH EVENT) ---
     private void HandlePlayerDeath()
     {
-        isPlayerDead = true; 
-        anim.SetInteger("state", (int)MovementState.dead); 
-        
-        // Hapus `rb.velocity = Vector2.zero;` di sini, biarkan PlayerHealth yang mengatur Rigidbody.
-        // rb.velocity = Vector2.zero; 
+        isPlayerDead = true;
+        currentState = MovementState.dead;
+        anim.SetInteger("state", (int)currentState);
+        Debug.Log("PlayerMovement: Menangani kematian. Mengatur state Dead.");
 
-        playerController.Disable(); // Nonaktifkan input dari Input System
-        mobileInputX = 0f; // Pastikan input mobile juga reset
-        isSliding = false; // Pastikan status sliding direset
+        playerController.Disable();
+        mobileInputX = 0f;
+        isSliding = false;
+        rb.velocity = Vector2.zero;
+        rb.angularVelocity = 0f;
     }
 
-    // --- FUNGSI UNTUK MENANGANI RESPPAWN PEMAIN ---
     private void HandlePlayerRespawn()
     {
-        isPlayerDead = false; 
-        playerController.Enable(); // Aktifkan kembali input
+        isPlayerDead = false;
+        isHurt = false;
+        playerController.Enable();
 
-        anim.SetInteger("state", (int)MovementState.idle); // Set animasi kembali ke idle saat respawn
-        Debug.Log("Player has respawned!");
+        currentState = MovementState.idle;
+        anim.SetInteger("state", (int)currentState);
+
+        Debug.Log("Player has respawned! Mengatur state Idle.");
+    }
+
+    private void HandlePlayerHurt()
+    {
+        if (isPlayerDead) return;
+
+        Debug.Log("PlayerMovement: Player terkena damage, masuk state HURT.");
+
+        isHurt = true;
+        currentState = MovementState.hurt;
+        anim.SetInteger("state", (int)currentState);
+        StartCoroutine(ExitHurtStateAfterDelay());
+    }
+
+    private IEnumerator ExitHurtStateAfterDelay()
+    {
+        float hurtDuration = anim.GetCurrentAnimatorStateInfo(0).length;
+
+        if (hurtDuration <= 0f) hurtDuration = 0.5f;
+
+        yield return new WaitForSeconds(hurtDuration);
+
+        isHurt = false;
+        Debug.Log("PlayerMovement: Keluar dari state HURT.");
     }
 }
